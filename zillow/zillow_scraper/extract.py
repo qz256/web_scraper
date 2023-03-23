@@ -1,19 +1,36 @@
 # zillow_scraper/extract.py
-
+import time
+import random
 import requests
+import datetime as dt
 from bs4 import BeautifulSoup
 
 tab_class_map = {
     'address': ('h1', 'Text-c11n-8-84-0__sc-aiai24-0 qxgaF'),
     'status': ('span', 'Text-c11n-8-84-0__sc-aiai24-0 dpf__sc-1yftt2a-1 qxgaF ixkFNb'),
+    'zestimate': ('span', 'Text-c11n-8-84-0__sc-aiai24-0 eIEmla'),
     'overview': ('span', 'Text-c11n-8-84-0__sc-aiai24-0 dpf__sc-2arhs5-3 qxgaF kOlNqB'),
-    'facts_and_features': ('span', 'Text-c11n-8-84-0__sc-aiai24-0 qxgaF'),
+    'facts_and_features': ('li', 'ListItem-c11n-8-84-0__sc-10e22w8-0 kDUoZv'),
     'price_and_tax_history': ('td', 'hdp__sc-f00yqe-0 igpNxE'),
-    'commute_time': ('span', 'Text-c11n-8-84-0__sc-aiai24-0 qxgaF')
+    'commute_time': ('span', 'Text-c11n-8-84-0__sc-aiai24-0 qxgaF'),
 }
 
 
-def extract_housing_info(url, headers):
+def extract_housing_info(url):
+    '''
+    :param url: Zillow house URL
+    :return: a dictionary with fields of interest
+    '''
+
+    # Add headers and random sleep time to bypass robot test
+    headers = {
+        "User-Agent": "Mozilla/5.0 (X11; Linux x86_64; rv:78.0)   Gecko/20100101 Firefox/78.0",
+        "Referer": "https://www.google.com"
+    }
+
+    sleep_time = random.randint(10, 19) / 10
+    time.sleep(sleep_time)
+
     response = requests.get(url, headers=headers)
     soup = BeautifulSoup(response.content, 'html.parser')
 
@@ -21,48 +38,61 @@ def extract_housing_info(url, headers):
     for key in tab_class_map.keys():
         housing_info[key] = soup.find_all(tab_class_map.get(key)[0], class_=tab_class_map.get(key)[1])
 
+    feature_info = dict()
+    for feature in housing_info['facts_and_features']:
+        text = feature.get_text(strip=True).split(':')
+        if len(text) == 2:
+            feature_info = {**feature_info, **dict([text])}
+
     return {
         # Extract information from the HTML using BeautifulSoup selectors
-        # 'date': housing_info['price_and_tax_history'][0].get_text(strip=True),
-        'address': housing_info['address'][0].get_text(strip=True),
-        'url': url,
-        'status': housing_info['status'][0].get_text(strip=True),
-        'region': soup.find('span', {'class':'.region-selector'}).text.strip(),
-        'home_type': housing_info['overview'][0].get_text(strip=True),
-        'year_built': housing_info['overview'][1].get_text(strip=True).split()[-1],
-        'list_price': soup.find('span', {'data-testid': 'price'}).get_text(strip=True),
-        'zestimate': soup.find('span', {'class':'.zestimate-selector'}).text.strip(),
-        'hoa': soup.find('span', {'class':'.hoa-selector'}).text.strip(),
-        'square_feet': soup.find_all('span', {'data-testid': 'bed-bath-item'})[2].find('strong').text,
-        'price_per_sqft': housing_info['overview'][6].get_text(strip=True).split()[0],
-        'bedrooms': soup.find_all('span', {'data-testid': 'bed-bath-item'})[0].find('strong').text,
-        'bathrooms': soup.find_all('span', {'data-testid': 'bed-bath-item'})[1].find('strong').text,
-        'cooling': housing_info['overview'][3].get_text(strip=True),
-        'heating': housing_info['overview'][2].get_text(strip=True),
-        'total_parking_spaces': soup.find('span', {'class':'.total-parking-spaces-selector'}).text.strip(),
-        'parking_features': soup.find('span', {'class':'.parking-features-selector'}).text.strip(),
-        'attached_garage': soup.find('span', {'class':'.attached-garage-selector'}).text.strip(),
-        'garage_spaces': housing_info['overview'][4].get_text(strip=True),
-        # 'commute_time': soup.find('span', {'class':'.commute-time-selector'}).text.strip(),
-        'greatschools_rating': soup.find('span', {'class':'.greatschools-rating-selector'}).text.strip(),
-        'architectural_style': soup.find('span', {'class':'.architectural-style-selector'}).text.strip(),
-        'lot_size': housing_info['overview'][5].get_text(strip=True),
-        'lot_features': soup.find('span', {'class':'.lot-features-selector'}).text.strip(),
-        'exterior_features': soup.find('span', {'class':'.exterior-features-selector'}).text.strip(),
-        'patio_and_porch_details': soup.find('span', {'class':'.patio-and-porch-details-selector'}).text.strip(),
-        'fencing': soup.find('span', {'class':'.fencing-selector'}).text.strip(),
-        'annual_tax_amount': soup.find('span', {'class':'.annual-tax-amount-selector'}).text.strip(),
-        'see_more_interior': soup.find('span', {'class':'.see-more-interior-selector'}).text.strip(),
-        'property_condition': soup.find('span', {'class':'.property-condition-selector'}).text.strip(),
-        'new_construction': soup.find('span', {'class':'.new-construction-selector'}).text.strip(),
-        'see_more_property': soup.find('span', {'class':'.see-more-property-selector'}).text.strip(),
-        'hoa_and_financial': soup.find('span', {'class':'.hoa-and-financial-selector'}).text.strip(),
-        'tax_assessed_value': soup.find('span', {'class':'.tax-assessed-value-selector'}).text.strip(),
-        'listing_terms': soup.find('span', {'class':'.listing-terms-selector'}).text.strip(),
-        'buyer_agent_fee': f"{housing_info['overview'][7].get_text(strip=True).split('%')[0]}%",
-        'offer_review_date': soup.find('span', {'class':'.offer-review-date-selector'}).text.strip(),
-        'rent_zestimate': soup.find('span', {'class':'.rent-zestimate-selector'}).text.strip(),
-        'community_and_neighborhood': soup.find('span', {'class':'.community-and-neighborhood-selector'}).text.strip(),
-        'walk_score': soup.find('span', {'class':'.walk-score-selector'}).text.strip(),
-        'transit_score': soup.find('span', {'class':'.transit-score-selector'}).text.strip()
+        # TODO: get listing date from price and tax history
+        'Date': dt.datetime.strftime(dt.datetime.today().date(), '%m/%d/%Y'),
+        'Address': housing_info['address'][0].get_text(strip=True),
+        'URL': url,
+        'Status': housing_info['status'][0].get_text(strip=True),
+        'Region': feature_info.get('Region'),
+        'Home type': feature_info.get('Home type', housing_info['overview'][0].get_text(strip=True)),
+        'Year built': feature_info.get('Year built', housing_info['overview'][1].get_text(strip=True).split()[-1]),
+        'List price': soup.find('span', {'data-testid': 'price'}).get_text(strip=True),
+        'Zestimate': housing_info['zestimate'][0].get_text(strip=True),
+        'Hoa': None,  # TODO: get HOA information
+        'Square feet': soup.find_all('span', {'data-testid': 'bed-bath-item'})[2].find('strong').text,
+        'Price/sqft': housing_info['overview'][6].get_text(strip=True).split()[0],
+        'Bedrooms': soup.find_all('span', {'data-testid': 'bed-bath-item'})[0].find('strong').text,
+        'Bathrooms': soup.find_all('span', {'data-testid': 'bed-bath-item'})[1].find('strong').text,
+        'Cooling': feature_info.get('Cooling features', housing_info['overview'][3].get_text(strip=True)),
+        'Heating': feature_info.get('Heating features', housing_info['overview'][2].get_text(strip=True)),
+        'Total parking spaces': feature_info.get('Total spaces'),
+        'Parking features': feature_info.get('Parking features'),
+        'Attached garage': None,  # TODO: get attached_garage information
+        'Garage spaces': feature_info.get('Garage spaces'),
+        'Commute time': None,  # TODO: get commute_time information
+        'Greatschools rating': None,  # TODO: get greatschools_rating information
+        'Middle': None,  # TODO: get greatschools_rating information
+        'High': None,  # TODO: get greatschools_rating information
+        'Architectural style': feature_info.get('Architectural style'),
+        'Lot size': feature_info.get('Lot size'),
+        'Lot features': feature_info.get('Lot features'),
+        'Exterior features': feature_info.get('Exterior features'),
+        'Patio and porch details': feature_info.get('Patio and porch details'),
+        'Fencing': feature_info.get('Fencing'),
+        'Annual tax amount': feature_info.get('Annual tax amount'),
+        'Interior': feature_info.get('Interior'),
+        'Property condition': feature_info.get('Property condition'),
+        'New construction': feature_info.get('New construction'),
+        'Property': feature_info.get('Property'),
+        'HOA and financial': feature_info.get('HOA and financial'),
+        'Tax assessed value': feature_info.get('Tax assessed value'),
+        'Listing terms': feature_info.get('Listing terms'),
+        "Buyer's agent fee": feature_info.get("Buyer's agent fee",
+                                              f"{housing_info['overview'][7].get_text(strip=True).split('%')[0]}%"),
+        'Offer review date': feature_info.get('Offer review date'),
+        'Rent Zestimate': feature_info.get('Rent Zestimate'),
+        'Community and neighborhood': feature_info.get('Community and neighborhood'),
+        'Walk Score®': None,  # TODO: get walk_score information
+        'Transit Score™': None,  # TODO: get transit_score information
+        'Basement': feature_info.get('Basement'),
+        'Laundry': feature_info.get('Laundry features'),
+        'Fireplaces': feature_info.get('Fireplace features'),
     }
