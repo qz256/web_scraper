@@ -13,5 +13,5 @@ if __name__ == '__main__':
     summary = pd.DataFrame()
     for url in url_list:
         housing_info = extract_housing_info(url)
-        summary = summary.append(pd.DataFrame([housing_info]))
+        summary = pd.concat([summary, pd.DataFrame([housing_info])])
     summary.to_excel(f"data/{dt.datetime.strftime(dt.datetime.today().date(), '%Y%m%d')}_house_listing.xlsx", index=False)
